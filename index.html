@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
+<head profile="https://www.w3.org/2005/10/profile">
+<link rel="icon" type="image/png" href="https://www.irceline.be/air/favicon.ico">
+	<title>Air pollution map of Belgium</title>
+	<meta charset="utf-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<link rel="stylesheet" href="https://unpkg.com/leaflet@1.5.1/dist/leaflet.css"
+  integrity="sha512-xwE/Az9zrjBIphAcBb3F6JVqxf46+CDLwfLMHloNu6KEQCAWi6HcDUbeOfBIptF7tcCzusKFjFw2yuvEpDL9wQ=="
+  crossorigin=""/>
+	<link rel="stylesheet" href="https://api.mapbox.com/mapbox.js/plugins/leaflet-fullscreen/v1.0.1/leaflet.fullscreen.css" />
+	<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet-easybutton@2/src/easy-button.css">
+
+	<link  href="https://unpkg.com/leaflet-geosearch@latest/assets/css/leaflet.css" rel="stylesheet" />
+
+	<link rel="stylesheet" href="./css/styles.css" />
+
+</head>
+<body>
+
+	<div class="mapbox">
+		<div id="map">
+		</div>
+		<div class="overlay">
+			<div class="timechanger">
+				<div>
+					<span id="lastUpdatePreText">Last update: </span>
+					<span id="lastUpdate">the year of the last update</span>
+				</div>
+				<div style="text-align: center; ">
+					<input type="button" id="backHour" value="<<" onclick="" />
+					<span id="showTimeText">change time</span>
+					<input type="button" id="forwardHour" value=">>" onclick="" />
+				</div>
+			</div>
+		</div>
+	</div>
+
+	<script src="https://unpkg.com/leaflet@1.5.1/dist/leaflet.js"
+		integrity="sha512-GffPMF3RvMeYyc1LWMHtK8EbPv0iNZ8/oTtHPx9/cc2ILxQ+u905qIwdpULaqDkyBKgOaB57QTMg7ztg8Jm2Og=="
+		crossorigin="">
+	</script>
+	<script>
+			if (!window.moment) {
+					document.write('<script src="./js/external/leaflet.js"><\/script>');
+			}
+	</script>
+	<script src="https://unpkg.com/leaflet-geosearch@latest/dist/bundle.min.js"></script>
+	<script src="https://api.mapbox.com/mapbox.js/plugins/leaflet-fullscreen/v1.0.1/Leaflet.fullscreen.min.js"></script>
+	<script src="./js/external/leaflet.wms/leaflet.wms.js"></script>
+
+	<script src="https://cdn.jsdelivr.net/npm/leaflet-easybutton@2/src/easy-button.js"></script>
+
+	<script src="https://code.jquery.com/jquery-3.4.1.slim.js"
+		integrity="sha256-BTlTdQO9/fascB1drekrDVkaKd9PkwBymMlHOiG+qLI="
+		crossorigin="anonymous">
+	</script>
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.24.0/moment-with-locales.min.js"></script>
+	<script>
+			if (!window.moment) {
+					document.write('<script src="./js/external/moment.js"><\/script>');
+			}
+	</script>
+
+	<script src="./i18n/tr_en.js"></script>
+	<script src="./i18n/tr_de.js"></script>
+	<script src="./i18n/tr_fr.js"></script>
+	<script src="./i18n/tr_nl.js"></script>
+	<script src="./js/parameters.js"></script>
+	<script src="./js/url.js"></script>
+	<script src="./js/time_formats.js"></script>
+	<script src="./js/download.js"></script>
+
+	<script>
+
+		function isInArray(value, array) { return array.indexOf(value) > -1; }
+
+		function setShowTimeText(text) { $("span#showTimeText").text(text); }
+
+		function createLayerInfo(layerLabelId, displayName, layerName, layer) {
+			return {
+				layerLabelId: layerLabelId,
+				layerName: layerName,
+				displayName: displayName,
+				layer: layer,
+				getHtml: function(){
+					return "<span id=" + this.layerLabelId + ">" + this.displayName + "</span>";
+				}
+			};
+		}
+
+		function addSourceToLeaflet(showTimeValue, lastUpdateParameters) {
+			var sourceOptions = {
+				transparent: true,
+				format: 'image/png',
+				opacity: 0.7,
+				tiled: true,
+				info_format: 'text/html',
+				time: showTimeValue
+			};
+
+			var station_cql_filter = lastUpdateParameters.station_cql_filter();
+			if (station_cql_filter !== "") {
+				sourceOptions.cql_filter = station_cql_filter;
+			}
+			return L.WMS.source(getWmsBaseUrl(), sourceOptions);
+		}
+
+		function createLegendButton() {
+			var legendButtonText = '<span>'+ 'LEGEND'+ '</span>';
+
+			return L.easyButton({
+				id: 'legendButtonId',
+				position: 'bottomleft',
+				states:[{
+					stateName: 'closed',
+					onClick: function(btn){
+						$("#legendImg").show();
+						btn.state('open');
+					},
+					icon: legendButtonText
+				},{
+					stateName: 'open',
+					onClick: function(btn){
+						$("#legendImg").hide();
+						btn.state('closed');
+					},
+					icon: legendButtonText
+				}]
+
+			});
+		}
+
+		function createLeafletMap(parameters, maxZoomLevel) {
+			return L.map('map', {
+				center: [parameters.lat || 50.51, parameters.long || 4.5],
+				minZoom: 7,
+				maxZoom: maxZoomLevel || 19,
+				zoom: parameters.zoom || 7,
+				fullscreenControl: {
+					pseudoFullscreen: false // if true, fullscreen to page width and height
+				},
+				attributionControl: false
+			}).fitBounds([[49.5, 3.5], [51.5, 5.5]]);
+		}
+
+		function getLastUpdate(url) {
+			return fetch(url)
+					.then(function(response) {
+						return response.json();
+					})
+					.then(function(dataAsJson) {
+						var lastUpdateParams = setLastUpdateParams(dataAsJson);
+						setupMap(lastUpdateParams);
+					}).catch(function() {
+						console.error("Error while getting the time with lastupdate.");
+						setupMap(getDefaultLastUpdateParameters());
+					});
+		}
+
+		function getNewLabelControl(layerInfos) {
+			var overlayLayers = {};
+			layerInfos.forEach(function(label) {
+				overlayLayers[label.getHtml()] = label.layer;
+			});
+			return new L.Control.Layers(null, overlayLayers, {collapsed: false, position: 'topright'});
+		}
+
+		function styleLayerLabels(layerInfos) {
+			layerInfos.forEach(function(label) {
+				$("span#"+ label.layerLabelId).text(label.displayName);
+			});
+		}
+
+		function createInterpolatedLayer(showTimeValue, parameters, lastUpdateParameters, map) {
+			var interpolatedWmsOptions = {
+				layers: getInterpolatedLayerName(parameters),
+				transparent: true,
+				format: 'image/png',
+				opacity: 0.7,
+				tiled: true,
+				time: showTimeValue
+			};
+			var interpolated_cql_filter = lastUpdateParameters.interpolated_cql_filter();
+			if (interpolated_cql_filter !== "") {
+				console.log(showTimeValue);
+				interpolatedWmsOptions.cql_filter = interpolated_cql_filter;
+			}
+			return L.tileLayer.wms(getWmsBaseUrl(), interpolatedWmsOptions).addTo(map);
+		}
+
+		/**
+		 * @param layerName the layer to retrieve
+		 * @param outputFormat output format, needs to be a member of downloadFormats.
+		 * @param showTime time filter to retrieve less data
+		 */
+		function getDownloadUrl(layerName, outputFormat, showTime) {
+			return 'https://geo.irceline.be/wfs?SERVICE=WFS&REQUEST=GetFeature&VERSION=2.0.0&TYPENAMES='+ layerName +
+						 '&SRSNAME=urn:ogc:def:crs:EPSG::31370&outputFormat=' + outputFormat + '&cql_filter=timestamp=\'' +
+             moment(showTime).toISOString() + '\'';
+		}
+
+		function getDownload(url, layerDisplayName,callback, responseType) {
+			var request = new XMLHttpRequest();
+			request.open('GET', url, true);
+			request.responseType = responseType;
+			request.onload = function() {
+				var status = request.status;
+				if (status === 200) {
+					callback(request.response, layerDisplayName);
+				} else {
+					//as fallback, prompt the user with the download-url
+					alert('To download, visit url: ' + url);
+				}
+			};
+			request.send();
+		}
+
+		var providedParams = getProvidedUrlParameters();
+		//Fill params with the providedParams if those are valid
+		var params = setParams(providedParams);
+		//load translations
+		var langParams = getLanguageSpecificParameters(params.lang);
+
+		//Set initial translations
+		$("span#lastUpdatePreText").text(langParams.lastUpdatePreText);
+		$("span#lastUpdate").text(langParams.lastUpdateDateTimeText[params.interval]);
+		setShowTimeText(langParams.lastUpdateInitialChangeTime[params.interval]);
+
+		var urlForLastUpdate = getUrlToGetLastUpdate(params.interval, params.resolution);
+		getLastUpdate(urlForLastUpdate);
+
+    function setupMap(lastUpdateParams){
+
+      var showTime = timeFormats.showTimeFunction[params.interval](lastUpdateParams.lastupdate);
+      moment.locale(langParams.momentLocale);
+      var lastUpdateText = timeFormats.lastUpdateFunction[params.interval](lastUpdateParams.lastupdate);
+      $("span#lastUpdate").text(lastUpdateText);
+
+      // INITIALIZE MAP
+			//you don't have to check for lat, long & zoom between min and max, this gets enforced by leaflet
+			var map = createLeafletMap(params, lastUpdateParams.maxZoom);
+
+			var layerInfos = [];
+
+			/**
+			 * Create station-layer with a Name, a leaflet-Layer and a label.
+			 * Put it in the layerLabel array.
+			 */
+			var stationLayerName;
+			var stationLayer;
+			if (params.no_stations === 'false') {
+				stationLayerName = getStationLayerName(params);
+				var source = addSourceToLeaflet(showTime, lastUpdateParams);
+				stationLayer = source.getLayer(stationLayerName).addTo(map);
+				var stationLayerLabel = langParams.layers.measuredMean[params.interval];
+				layerInfos.push(createLayerInfo("stationLayerLabel",stationLayerLabel,stationLayerName,stationLayer));
+			}
+
+			var interpolatedLayer = createInterpolatedLayer(showTime, params, lastUpdateParams, map);
+			var interpolatedLayerLabel = langParams.layers.meanInterpolated[params.interval] + langParams.layers.interpolated;
+			layerInfos.push(createLayerInfo("interpolatedLayerLabel",interpolatedLayerLabel,getInterpolatedLayerName(params),
+																				interpolatedLayer));
+
+      L.tileLayer('https://{s}.tile.osm.org/{z}/{x}/{y}.png', { zIndex: -1, maxZoom: 19}).addTo(map);
+      L.control.scale({position: 'bottomright', imperial: false}).addTo(map);
+
+			/**
+			 * Add GeoSearch
+			 * See: https://github.com/smeijer/leaflet-geosearch
+			 */
+
+			var GeoSearchControl = window.GeoSearch.GeoSearchControl;
+			var OpenStreetMapProvider = window.GeoSearch.OpenStreetMapProvider;
+
+			var provider = new OpenStreetMapProvider({ params: { countrycodes: 'be' }, });
+			var searchControl = new GeoSearchControl({
+			  provider: provider,
+				autoComplete: true,
+				showMarker: true,
+				autoClose: true
+			});
+			map.addControl(searchControl);
+
+			/**
+			 * Add controls & attribution
+			 */
+
+      var layerLabelControl = getNewLabelControl(layerInfos);
+      map.addControl(layerLabelControl);
+			styleLayerLabels(layerInfos);
+
+			L.control.attribution({position: 'bottomleft'}).addTo(map);
+			map.attributionControl.setPrefix(
+					'&copy; <a href="https://www.irceline.be/" target="_blank">IRCEL - CELINE</a> | ' +
+					'<a href="https://www.openstreetmap.org/copyright" target="_blank">OSM</a> | ' +
+					'<a href="https://leafletjs.com/" target="_blank">Leaflet</a>');
+
+			var legendButton = createLegendButton();
+			legendButton.addTo(map);
+			$("#legendButtonId").css({width:'80px'});
+
+			/**
+			 * Create Legend.
+			 */
+			L.Control.Legend = L.Control.extend({
+				onAdd: function() {
+					var div = L.DomUtil.create('div', 'info legend');
+					div.innerHTML +=
+							'<div class="scale" ><div id="legendImg"><img src=' + getLegendUrl(params) +
+							' style="background-color:rgba(255,255,255,0.75);height:100%" alt="legend"></div></div>';
+					return div;
+				},
+				onRemove: function(map) {/* Nothing to do here*/}
+			});
+			L.control.legend = function(opts) {return new L.Control.Legend(opts);};
+			L.control.legend({ position: 'bottomleft' }).addTo(map);
+			$("#legendImg").hide();
+
+			L.Control.DownloadContainer = L.Control.extend({
+				onAdd: function() {
+
+					var divLayers = '<div id="popup-layers">';
+					layerInfos.forEach(function(label) {
+						divLayers+='<input type="checkbox" id="'+label.layerLabelId+'checkbox'+'" /><span>'+label.getHtml()+'</span><br>';
+					});
+					divLayers +='</div>';
+
+					var divDownloadFormats = '<select id="downloadFormats" style="width:100%">';
+					getDownloadFormats().forEach(function(format) {
+						divDownloadFormats+='<option value="'+format+'">'+ format + '</option>';
+					});
+					divDownloadFormats+='</select>';
+
+					var div = L.DomUtil.create('div', 'download');
+					L.DomEvent.disableClickPropagation(div);
+					div.innerHTML+='<div><div class="ol-popup" id="downloadContainer" style="background-color:rgba(255,255,255,0.75);' +
+												 'padding:10px;border-radius:5px;">' +
+												 divLayers + '<div id="popup-formats" style="padding:10px">'+divDownloadFormats+'</div><div>' +
+												 '<button style="background-image: url(./images/data-transfer-download.svg);' +
+												 'background-size: 20px 20px;height:30px;width:30px;background-repeat: no-repeat;' +
+												 'background-position: center;" id="downloadButton" value="Closed" onclick=""></button></div></div>' +
+												 '<div><button id="downloadOptionsButton">Download Options</button></div></div>';
+					return div;
+				},
+				onRemove: function(map) {/* Nothing to do here*/}
+			});
+
+			L.control.downloadContainer = function(opts) {return new L.Control.DownloadContainer(opts);};
+
+			var downloadContainer = L.control.downloadContainer({position: 'bottomright'});
+			downloadContainer.addTo(map);
+
+			var requestedDownloadOptions;
+			function setDownloadButtonLogic() {
+				$("#downloadContainer").hide();
+				$("#downloadOptionsButton").click(function() {
+					if ($("#downloadOptionsButton").val() === 'Open') {
+						$("#downloadOptionsButton").val('Closed');
+						$("#downloadContainer").hide();
+					} else {
+						$("#downloadOptionsButton").val('Open');
+						$("#downloadContainer").show();
+					}
+				});
+
+				$("#downloadButton").click(function() {
+					requestedDownloadOptions = {};
+					requestedDownloadOptions.sideFormat = getSideFormats($("#downloadFormats option:selected").val());
+					requestedDownloadOptions.layersToDownload = [];
+					layerInfos.forEach(function(layerInfo) {
+						if ($("input:checkbox#" + layerInfo.layerLabelId + 'checkbox').is(':checked')) {
+							requestedDownloadOptions.layersToDownload.push(layerInfo);
+						}
+					});
+
+					if (requestedDownloadOptions.layersToDownload.length === 0) {
+						alert("Please select a layer to download!");
+					} else {
+						$("#downloadOptionsButton").click();
+						var nrOfLayersToDownload = requestedDownloadOptions.layersToDownload.length;
+						for (var i = 0; i < nrOfLayersToDownload; i++) {
+							var layerDisplayName = requestedDownloadOptions.layersToDownload[i].displayName;
+							var downloadUrl = getDownloadUrl(	requestedDownloadOptions.layersToDownload[i].layerName,
+																								requestedDownloadOptions.sideFormat.urlOutputFormat, showTime);
+							getDownload(downloadUrl, layerDisplayName, function(response, layerDisplayName) {
+								download(response, layerDisplayName + '.' + requestedDownloadOptions.sideFormat.fileFormat,
+										requestedDownloadOptions.sideFormat.downloadFormat);
+							}, 'blob');
+						}
+					}
+				});
+			}
+			setDownloadButtonLogic();
+
+      /**
+       * Update the whole map with controls when the time changes.
+       */
+      function updateMapForTimeChange(showTimeValue, showTimeTextValue) {
+        interpolatedLayer.setParams({time:showTimeValue});
+
+				if (params.no_stations === 'false') {
+					map.removeLayer(stationLayer);
+					stationLayer = addSourceToLeaflet(showTimeValue,lastUpdateParams).getLayer(stationLayerName).addTo(map);
+					layerInfos.forEach(function(layer) {
+						if (layer.layerLabelId === 'stationLayerLabel') {
+							layer.layer = stationLayer;
+						}
+					});
+				}
+        map.removeControl(layerLabelControl);
+        layerLabelControl = getNewLabelControl(layerInfos);
+        map.addControl(layerLabelControl);
+				styleLayerLabels(layerInfos);
+				setShowTimeText(showTimeTextValue);
+      }
+
+			$('#backHour').click(function(){
+				var changeUnit = timeFormats.changeDateTime[params.interval];
+				var changeTimeFormat = timeFormats.changeDateTimeFormat[params.interval];
+				showTime = moment(showTime).subtract(1, changeUnit).toISOString();
+				var showTimeText = moment(showTime).format(changeTimeFormat); //showTime already subtracted
+
+        updateMapForTimeChange(showTime, showTimeText);
+      });
+      $('#forwardHour').click(function(){
+				var changeUnit = timeFormats.changeDateTime[params.interval];
+				var changeTimeFormat = timeFormats.changeDateTimeFormat[params.interval];
+				showTime = moment(showTime).add(1, changeUnit).toISOString();
+				var showTimeText = moment(showTime).format(changeTimeFormat);
+
+        updateMapForTimeChange(showTime, showTimeText);
+      });
+    }
+
+	</script>
+
+	<script type="text/javascript">
+
+	  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+	  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+	  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+	  })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+
+	  ga('create', 'UA-39432073-1', 'auto');
+	  ga('send', 'pageview');
+
+	</script>
+
+</body>
+
+</html>
