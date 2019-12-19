@@ -132,6 +132,8 @@
 		}
 
 		function createLeafletMap(parameters, maxZoomLevel) {
+			var bounds = getRegionBounds(parameters.region);
+
 			return L.map('map', {
 				center: [parameters.lat || 50.51, parameters.long || 4.5],
 				minZoom: 7,
@@ -141,7 +143,7 @@
 					pseudoFullscreen: false // if true, fullscreen to page width and height
 				},
 				attributionControl: false
-			}).fitBounds([[49.5, 3.5], [51.5, 5.5]]);
+			}).fitBounds(bounds);
 		}
 
 		function getLastUpdate(url) {
