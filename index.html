@@ -30,7 +30,7 @@
 				<div style="text-align: center; ">
 					<input type="button" id="backHour" value="<<" onclick="" />
 					<span id="showTimeText">change time</span>
-					<input type="button" id="forwardHour" value=">>" onclick="" />
+					<input type="button" id="forwardHour" value=">>" onclick="" style="display:none" />
 				</div>
 			</div>
 		</div>
@@ -418,10 +418,17 @@
 				setShowTimeText(showTimeTextValue);
       }
 
+      // Saving original time for use of displaying the forwardHour button
+      var originalTime = timeFormats.showTimeFunction[params.interval](lastUpdateParams.lastupdate);
+
 			$('#backHour').click(function(){
 				var changeUnit = timeFormats.changeDateTime[params.interval];
 				var changeTimeFormat = timeFormats.changeDateTimeFormat[params.interval];
 				showTime = moment(showTime).subtract(1, changeUnit).toISOString();
+
+				if (originalTime !== showTime) {
+					$('#forwardHour').css("display", "inline");
+				}
 				var showTimeText = moment(showTime).format(changeTimeFormat); //showTime already subtracted
 
         updateMapForTimeChange(showTime, showTimeText);
@@ -430,6 +437,10 @@
 				var changeUnit = timeFormats.changeDateTime[params.interval];
 				var changeTimeFormat = timeFormats.changeDateTimeFormat[params.interval];
 				showTime = moment(showTime).add(1, changeUnit).toISOString();
+
+				if (originalTime === showTime) {
+					$('#forwardHour').css("display", "none");
+				}
 				var showTimeText = moment(showTime).format(changeTimeFormat);
 
         updateMapForTimeChange(showTime, showTimeText);
