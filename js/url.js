@@ -66,6 +66,11 @@ function getInterpolatedLayerName(parameters) {
   }
   var workspaceName = getWorkspace(parameters.resolution);
   var layerName = workspaceName + ":" + nameParameters.join("_");
-  //Add region if necessary
-  return  parameters.region === "" ? layerName : layerName + "_" + parameters.region;
+
+  //Add region if necessary (not for Belgium and currently also not for Brussels)
+  if (parameters.region === "" || parameters.region === "br") {
+    return layerName;
+  } else {
+    return layerName + "_" + parameters.region;
+  }
 }
