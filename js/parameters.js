@@ -103,8 +103,9 @@ function getRegionBounds(region) {
     case "vl": return [[50.688,2.545],[51.505,5.911]];
     // Wallonia
     case "wl": return [[49.497,2.842],[50.812,6.408]];
+    // Brussels
+    case "br": return [[50.73,4.21],[50.936,4.56]];
     // Belgium
-    case "br":
     case "":
     default: return [[49.5, 3.5], [51.5, 5.5]];
   }
