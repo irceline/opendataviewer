@@ -30,7 +30,7 @@ function getAllParameterValues(){
     interval: ["hmean","24hmean","8hmean","maxhmean","max8hmean","dmean","anmean","19thmaxhmean"],
     resolution: ["atmostreet","rioifdm","rio4x4","rio1x1"],
     region:["","vl","br","wl"],
-    zoom:[],
+    zoom:[]
   }
 }
 
@@ -220,4 +220,19 @@ function setLastUpdateParams(providedLastUpdateParameters) {
     }
   }
   return lastUpdateParamResult;
+}
+
+function filterOnProvidedRegion(providedRegion, lastUpdateParams) {
+  switch (providedRegion) {
+  case 'vl':
+    lastUpdateParams.cql_filter.network = 'Flanders';
+    break;
+  case 'wl':
+    lastUpdateParams.cql_filter.network = 'Wallonia';
+    break;
+  case 'br':
+  case '':
+  default:
+      // Currently no filter for Brussels or Belgium
+  }
 }

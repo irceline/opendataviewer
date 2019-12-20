@@ -153,6 +153,7 @@
 					})
 					.then(function(dataAsJson) {
 						var lastUpdateParams = setLastUpdateParams(dataAsJson);
+						filterOnProvidedRegion(params.region, lastUpdateParams);
 						setupMap(lastUpdateParams);
 					}).catch(function() {
 						console.error("Error while getting the time with lastupdate.");
@@ -275,7 +276,7 @@
 			var GeoSearchControl = window.GeoSearch.GeoSearchControl;
 			var OpenStreetMapProvider = window.GeoSearch.OpenStreetMapProvider;
 
-			var provider = new OpenStreetMapProvider({ params: { countrycodes: 'be' }, });
+			var provider = new OpenStreetMapProvider({ params: { countrycodes: 'be' } });
 			var searchControl = new GeoSearchControl({
 			  provider: provider,
 				autoComplete: true,
