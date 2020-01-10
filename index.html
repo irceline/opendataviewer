@@ -30,7 +30,7 @@
 				<div style="text-align: center; ">
 					<input type="button" id="backHour" value="<<" onclick="" />
 					<span id="showTimeText">change time</span>
-					<input type="button" id="forwardHour" value=">>" onclick="" style="display:none" />
+					<input type="button" id="forwardHour" value=">>" onclick="" disabled />
 				</div>
 			</div>
 		</div>
@@ -389,7 +389,15 @@
       /**
        * Update the whole map with controls when the time changes.
        */
-      function updateMapForTimeChange(showTimeValue, showTimeTextValue) {
+
+      // Saving original time for use of displaying the forwardHour button
+      var originalTime = timeFormats.showTimeFunction[params.interval](lastUpdateParams.lastupdate);
+
+      function updateMapForTimeChange(showTimeValue) {
+
+		var timeFormat = timeFormats.changeDateTimeFormat[params.interval];
+		var showTimeTextValue = moment(showTimeValue).format(timeFormat);
+
         interpolatedLayer.setParams({time:showTimeValue});
 
 				if (params.no_stations === 'false') {
@@ -406,45 +414,89 @@
         map.addControl(layerLabelControl);
 				styleLayerLabels(layerInfos);
 				setShowTimeText(showTimeTextValue);
-      }
-
-      // Saving original time for use of displaying the forwardHour button
-      var originalTime = timeFormats.showTimeFunction[params.interval](lastUpdateParams.lastupdate);
-
-      function navigatePreviousHour() {
-
-		var changeUnit = timeFormats.changeDateTime[params.interval];
-		var changeTimeFormat = timeFormats.changeDateTimeFormat[params.interval];
-		showTime = moment(showTime).subtract(1, changeUnit).toISOString();
 
 		if (originalTime !== showTime) {
-			$('#forwardHour').css("display", "inline");
+			$('#forwardHour').prop("disabled", false);
+		} else {
+			$('#forwardHour').prop("disabled", true);
 		}
-		var showTimeText = moment(showTime).format(changeTimeFormat); //showTime already subtracted
-
-		updateMapForTimeChange(showTime, showTimeText);
       }
 
-      function navigateNextHour() {
 
+      // Navigate in time by arbitrary amounts.
+      function navigateTimeBackwards(amount, unit) {
+		showTime = moment(showTime).subtract(amount, unit).toISOString();
+		updateMapForTimeChange(showTime);
+      }
+
+      function navigateTimeForward(amount, unit) {
+		showTime = moment(showTime).add(amount, unit).toISOString();
+		updateMapForTimeChange(showTime);
+      }
+
+      // Navigate in time by a single amount of the selected resolution in "params.interval".
+	  function timestepBackwards() {
 		var changeUnit = timeFormats.changeDateTime[params.interval];
-		var changeTimeFormat = timeFormats.changeDateTimeFormat[params.interval];
-		showTime = moment(showTime).add(1, changeUnit).toISOString();
+		navigateTimeBackwards(1, changeUnit);
+	  }
 
-		if (originalTime === showTime) {
-			$('#forwardHour').css("display", "none");
+	  function timestepForward() {
+		var changeUnit = timeFormats.changeDateTime[params.interval];
+		navigateTimeForward(1, changeUnit);
+	  }
+
+
+      // Install mouse- and keyboard event handlers for navigating within the time domain.
+
+	  $('#backHour').click(function() {
+	  	timestepBackwards();
+      });
+      $('#forwardHour').click(function() {
+      	timestepForward();
+      });
+
+	  $(document).keydown(function(event) {
+
+		// Debugging
+		/*
+		var key = {
+			keyCode: event.keyCode, key: event.key,
+			shift: event.shiftKey, alt: event.altKey, ctrl: event.ctrlKey, meta: event.metaKey,
+		};
+		console.log("Handler for .keydown() called:", key);
+		*/
+
+		switch (event.keyCode) {
+
+			case 37:
+				event.preventDefault();
+				if (event.shiftKey && event.altKey) {
+					navigateTimeBackwards(1, 'month');
+				} else if (event.altKey) {
+					navigateTimeBackwards(1, 'week');
+				} else if (event.shiftKey) {
+					navigateTimeBackwards(1, 'days');
+				} else {
+				  	timestepBackwards();
+				}
+				break;
+
+			case 39:
+				event.preventDefault();
+				if (event.shiftKey && event.altKey) {
+					navigateTimeForward(1, 'month');
+				} else if (event.altKey) {
+					navigateTimeForward(1, 'week');
+				} else if (event.shiftKey) {
+					navigateTimeForward(1, 'days');
+				} else {
+			      	timestepForward();
+				}
+				break;
+
 		}
-		var showTimeText = moment(showTime).format(changeTimeFormat);
 
-		updateMapForTimeChange(showTime, showTimeText);
-      }
-
-	  $('#backHour').click(function(){
-	  	navigatePreviousHour();
-      });
-      $('#forwardHour').click(function(){
-      	navigateNextHour();
-      });
+	  });
     }
 
     function main() {
