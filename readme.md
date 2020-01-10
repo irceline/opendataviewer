@@ -60,5 +60,17 @@ Display stations on top of modeled layer or not
 * possible values: `true` | `false`
 * default value: `false`
 
+## Keyboard time navigation
+
+Navigate backwards/forward through time via `left`/`right` arrow key.
+
+Default time increment is the unit of `interval`.
+
+Holding the following keys while navigating time with the `left`/`right` arrow keys changes this increment:
+
+* One day: `Shift`
+* One week: `Alt`
+* One month: `Shift`+`Alt`
+
 
 All data being displayed in this viewer is published under the [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) license.
