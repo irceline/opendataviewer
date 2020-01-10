@@ -146,18 +146,18 @@
 			}).fitBounds(bounds);
 		}
 
-		function getLastUpdate(url) {
+		function drawMap(context, url) {
 			return fetch(url)
 					.then(function(response) {
 						return response.json();
 					})
 					.then(function(dataAsJson) {
 						var lastUpdateParams = setLastUpdateParams(dataAsJson);
-						filterOnProvidedRegion(params.region, lastUpdateParams);
-						setupMap(lastUpdateParams);
+						filterOnProvidedRegion(context.params.region, lastUpdateParams);
+						setupMap(context, lastUpdateParams);
 					}).catch(function() {
 						console.error("Error while getting the time with lastupdate.");
-						setupMap(getDefaultLastUpdateParameters());
+						setupMap(context, getDefaultLastUpdateParameters());
 					});
 		}
 
@@ -219,21 +219,11 @@
 			request.send();
 		}
 
-		var providedParams = getProvidedUrlParameters();
-		//Fill params with the providedParams if those are valid
-		var params = setParams(providedParams);
-		//load translations
-		var langParams = getLanguageSpecificParameters(params.lang);
+    function setupMap(context, lastUpdateParams){
 
-		//Set initial translations
-		$("span#lastUpdatePreText").text(langParams.lastUpdatePreText);
-		$("span#lastUpdate").text(langParams.lastUpdateDateTimeText[params.interval]);
-		setShowTimeText(langParams.lastUpdateInitialChangeTime[params.interval]);
-
-		var urlForLastUpdate = getUrlToGetLastUpdate(params.interval, params.resolution);
-		getLastUpdate(urlForLastUpdate);
-
-    function setupMap(lastUpdateParams){
+      // Unpack parameters from context.
+      var params = context.params;
+      var langParams = context.langParams;
 
       var showTime = timeFormats.showTimeFunction[params.interval](lastUpdateParams.lastupdate);
       moment.locale(langParams.momentLocale);
@@ -421,31 +411,67 @@
       // Saving original time for use of displaying the forwardHour button
       var originalTime = timeFormats.showTimeFunction[params.interval](lastUpdateParams.lastupdate);
 
-			$('#backHour').click(function(){
-				var changeUnit = timeFormats.changeDateTime[params.interval];
-				var changeTimeFormat = timeFormats.changeDateTimeFormat[params.interval];
-				showTime = moment(showTime).subtract(1, changeUnit).toISOString();
+      function navigatePreviousHour() {
 
-				if (originalTime !== showTime) {
-					$('#forwardHour').css("display", "inline");
-				}
-				var showTimeText = moment(showTime).format(changeTimeFormat); //showTime already subtracted
+		var changeUnit = timeFormats.changeDateTime[params.interval];
+		var changeTimeFormat = timeFormats.changeDateTimeFormat[params.interval];
+		showTime = moment(showTime).subtract(1, changeUnit).toISOString();
 
-        updateMapForTimeChange(showTime, showTimeText);
+		if (originalTime !== showTime) {
+			$('#forwardHour').css("display", "inline");
+		}
+		var showTimeText = moment(showTime).format(changeTimeFormat); //showTime already subtracted
+
+		updateMapForTimeChange(showTime, showTimeText);
+      }
+
+      function navigateNextHour() {
+
+		var changeUnit = timeFormats.changeDateTime[params.interval];
+		var changeTimeFormat = timeFormats.changeDateTimeFormat[params.interval];
+		showTime = moment(showTime).add(1, changeUnit).toISOString();
+
+		if (originalTime === showTime) {
+			$('#forwardHour').css("display", "none");
+		}
+		var showTimeText = moment(showTime).format(changeTimeFormat);
+
+		updateMapForTimeChange(showTime, showTimeText);
+      }
+
+	  $('#backHour').click(function(){
+	  	navigatePreviousHour();
       });
       $('#forwardHour').click(function(){
-				var changeUnit = timeFormats.changeDateTime[params.interval];
-				var changeTimeFormat = timeFormats.changeDateTimeFormat[params.interval];
-				showTime = moment(showTime).add(1, changeUnit).toISOString();
-
-				if (originalTime === showTime) {
-					$('#forwardHour').css("display", "none");
-				}
-				var showTimeText = moment(showTime).format(changeTimeFormat);
-
-        updateMapForTimeChange(showTime, showTimeText);
+      	navigateNextHour();
       });
     }
+
+    function main() {
+		var providedParams = getProvidedUrlParameters();
+		//Fill params with the providedParams if those are valid
+		var params = setParams(providedParams);
+		//load translations
+		var langParams = getLanguageSpecificParameters(params.lang);
+
+		//Set initial translations
+		$("span#lastUpdatePreText").text(langParams.lastUpdatePreText);
+		$("span#lastUpdate").text(langParams.lastUpdateDateTimeText[params.interval]);
+		setShowTimeText(langParams.lastUpdateInitialChangeTime[params.interval]);
+
+		var urlForLastUpdate = getUrlToGetLastUpdate(params.interval, params.resolution);
+
+		// Make a context object which propagates all parameters throughout the machinery.
+		// TODO: Use OO features in the future.
+		var context = {params: params, langParams: langParams};
+
+		// Render the map.
+		drawMap(context, urlForLastUpdate);
+    }
+
+	$(document).ready(function() {
+		main();
+	});
 
 	</script>
 
